@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tres en Raya - Tic Tac Toe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#1a1a2e] flex items-center justify-center min-h-screen text-[#eee] font-sans">
+    <div id="root" class="text-center"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        function Square({ value, onSquareClick, isWinning }) {
+            return (
+                <button
+                    className={
+                        `w-[100px] h-[100px] bg-[#1a1a2e] border-none text-4xl font-bold text-[#eee] rounded-lg transition-colors duration-150
+                        ${value === null ? 'cursor-pointer hover:bg-[#2a2a4e]' : 'cursor-default opacity-85'}
+                        ${isWinning ? 'bg-[#0f3460] text-[#e94560]' : ''}`
+                    }
+                    onClick={onSquareClick}
+                    disabled={value !== null}
+                >
+                    {value}
+                </button>
+            );
+        }
+
+        function Board({ squares, winLine, onSquareClick }) {
+            const cells = squares.map((value, i) => (
+                <Square
+                    key={i}
+                    value={value}
+                    isWinning={winLine && winLine.includes(i)}
+                    onSquareClick={() => onSquareClick(i)}
+                />
+            ));
+
+            return (
+                <div className="grid grid-cols-3 gap-[4px] bg-[#0f3460] p-[4px] rounded-xl mx-auto mb-4 w-fit">
+                    {cells}
+                </div>
+            );
+        }
+
+        function calculateWinner(squares) {
+            const lines = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                [0, 4, 8], [2, 4, 6],
+            ];
+            for (const [a, b, c] of lines) {
+                if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
+                    return { winner: squares[a], line: [a, b, c] };
+                }
+            }
+            if (squares.every(s => s !== null)) return { winner: 'empate', line: null };
+            return null;
+        }
+
+        function Game() {
+            const [history, setHistory] = React.useState([Array(9).fill(null)]);
+            const [currentMove, setCurrentMove] = React.useState(0);
+            const currentSquares = history[currentMove];
+            const xIsNext = currentMove % 2 === 0;
+
+            const result = calculateWinner(currentSquares);
+            const gameOver = result !== null;
+
+            let status;
+            let statusClass = 'text-xl mb-4 px-4 py-2 rounded-lg inline-block bg-[#16213e]';
+            if (gameOver) {
+                if (result.winner === 'empate') {
+                    status = '¡Empate!';
+                } else {
+                    status = `Ganador: ${result.winner}`;
+                    statusClass = 'text-xl mb-4 px-4 py-2 rounded-lg inline-block bg-[#0f3460] text-[#e94560] font-bold';
+                }
+            } else {
+                status = `Turno de: ${xIsNext ? 'X' : 'O'}`;
+            }
+
+            function handleSquareClick(i) {
+                if (gameOver || currentSquares[i] !== null) return;
+
+                const nextSquares = currentSquares.slice();
+                nextSquares[i] = xIsNext ? 'X' : 'O';
+
+                const nextHistory = [...history.slice(0, currentMove + 1), nextSquares];
+                setHistory(nextHistory);
+                setCurrentMove(nextHistory.length - 1);
+            }
+
+            function jumpTo(move) {
+                setCurrentMove(move);
+            }
+
+            function resetGame() {
+                setHistory([Array(9).fill(null)]);
+                setCurrentMove(0);
+            }
+
+            const moves = history.map((_, move) => (
+                <button
+                    key={move}
+                    onClick={() => jumpTo(move)}
+                    className="bg-[#16213e] text-[#aaa] border border-[#0f3460] px-[10px] py-[4px] rounded cursor-pointer text-sm hover:bg-[#0f3460] hover:text-white"
+                >
+                    {move === 0 ? 'Ir al inicio' : `Ir al movimiento #${move}`}
+                </button>
+            ));
+
+            return (
+                <>
+                    <h1 className="text-[#e94560] text-3xl mb-2">Tres en Raya</h1>
+                    <div className={statusClass}>{status}</div>
+                    <Board
+                        squares={currentSquares}
+                        winLine={result ? result.line : null}
+                        onSquareClick={handleSquareClick}
+                    />
+                    <button
+                        className="bg-[#e94560] text-white border-none px-8 py-[0.65rem] text-base rounded-lg cursor-pointer font-semibold transition-colors duration-150 hover:bg-[#d63851]"
+                        onClick={resetGame}
+                    >
+                        Reiniciar
+                    </button>
+                    {history.length > 1 && (
+                        <div className="mt-4 flex flex-wrap gap-[4px] justify-center max-w-[320px] mx-auto">
+                            {moves}
+                        </div>
+                    )}
+                </>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<Game />);
+    </script>
+</body>
+</html>
