@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tres en Raya - Tic Tac Toe</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #eee;
+        }
+        #root { text-align: center; }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: #e94560;
+        }
+        .status {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        .winner { background: #0f3460; color: #e94560; font-weight: bold; }
+        .turn { background: #16213e; }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 4px;
+            background: #0f3460;
+            padding: 4px;
+            border-radius: 12px;
+            margin: 0 auto 1rem;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            background: #1a1a2e;
+            border: none;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #eee;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.15s;
+        }
+        .cell:hover:not(:disabled) { background: #2a2a4e; }
+        .cell:disabled { cursor: default; opacity: 0.85; }
+        .cell.win-cell { background: #0f3460; color: #e94560; }
+        .reset {
+            background: #e94560;
+            color: #fff;
+            border: none;
+            padding: 0.65rem 2rem;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.15s;
+        }
+        .reset:hover { background: #d63851; }
+        .history {
+            margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            justify-content: center;
+            max-width: 320px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .history button {
+            background: #16213e;
+            color: #aaa;
+            border: 1px solid #0f3460;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .history button:hover { background: #0f3460; color: #fff; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        function calculateWinner(squares) {
+            const lines = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                [0, 4, 8], [2, 4, 6],
+            ];
+            for (const [a, b, c] of lines) {
+                if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
+                    return { winner: squares[a], line: [a, b, c] };
+                }
+            }
+            if (squares.every(s => s !== null)) return { winner: 'empate', line: null };
+            return null;
+        }
+
+        const root = document.getElementById('root');
+
+        function Game() {
+            let history = [Array(9).fill(null)];
+            let currentMove = 0;
+
+            function getCurrentSquares() { return history[currentMove]; }
+            function getXIsNext() { return currentMove % 2 === 0; }
+
+            function render() {
+                const squares = getCurrentSquares();
+                const xIsNext = getXIsNext();
+                const result = calculateWinner(squares);
+                const gameOver = result !== null;
+
+                let statusText, statusClass = 'status';
+                if (gameOver) {
+                    if (result.winner === 'empate') {
+                        statusText = '¡Empate!';
+                        statusClass += ' turn';
+                    } else {
+                        statusText = 'Ganador: ' + result.winner;
+                        statusClass += ' winner';
+                    }
+                } else {
+                    statusText = 'Turno de: ' + (xIsNext ? 'X' : 'O');
+                    statusClass += ' turn';
+                }
+
+                root.innerHTML = '';
+                var title = document.createElement('h1');
+                title.textContent = 'Tres en Raya';
+                root.appendChild(title);
+
+                var statusEl = document.createElement('div');
+                statusEl.className = statusClass;
+                statusEl.textContent = statusText;
+                root.appendChild(statusEl);
+
+                var board = document.createElement('div');
+                board.className = 'board';
+                for (var i = 0; i < 9; i++) {
+                    (function(idx) {
+                        var cell = document.createElement('button');
+                        cell.className = 'cell' + (result && result.line && result.line.includes(idx) ? ' win-cell' : '');
+                        cell.textContent = squares[idx] || '';
+                        cell.disabled = squares[idx] !== null || gameOver;
+                        cell.addEventListener('click', function() { handleSquareClick(idx); });
+                        board.appendChild(cell);
+                    })(i);
+                }
+                root.appendChild(board);
+
+                var resetBtn = document.createElement('button');
+                resetBtn.className = 'reset';
+                resetBtn.textContent = 'Reiniciar';
+                resetBtn.addEventListener('click', resetGame);
+                root.appendChild(resetBtn);
+
+                if (history.length > 1) {
+                    var historyDiv = document.createElement('div');
+                    historyDiv.className = 'history';
+                    for (var m = 0; m < history.length; m++) {
+                        (function(move) {
+                            var btn = document.createElement('button');
+                            btn.textContent = move === 0 ? 'Ir al inicio' : 'Ir al movimiento #' + move;
+                            btn.addEventListener('click', function() { jumpTo(move); });
+                            historyDiv.appendChild(btn);
+                        })(m);
+                    }
+                    root.appendChild(historyDiv);
+                }
+            }
+
+            function handleSquareClick(i) {
+                const squares = getCurrentSquares();
+                if (calculateWinner(squares) || squares[i] !== null) return;
+
+                const nextSquares = squares.slice();
+                nextSquares[i] = getXIsNext() ? 'X' : 'O';
+
+                history = history.slice(0, currentMove + 1).concat([nextSquares]);
+                currentMove = history.length - 1;
+                render();
+            }
+
+            function jumpTo(move) {
+                currentMove = move;
+                render();
+            }
+
+            function resetGame() {
+                history = [Array(9).fill(null)];
+                currentMove = 0;
+                render();
+            }
+
+            render();
+        }
+
+        Game();
+    </script>
+</body>
+</html>

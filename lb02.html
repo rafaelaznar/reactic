@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laberinto - Maze</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #eee;
+        }
+        #root { text-align: center; }
+        h1 { font-size: 2rem; margin-bottom: 0.25rem; color: #e94560; }
+        canvas {
+            border-radius: 12px;
+            display: block;
+            margin: 0 auto;
+        }
+        .stats {
+            font-size: 0.85rem;
+            color: #aaa;
+            min-height: 1.5rem;
+        }
+        .btn {
+            border: none;
+            padding: 0.55rem 1.25rem;
+            font-size: 0.9rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.15s, opacity 0.15s;
+            background: #16213e;
+            color: #ddd;
+            border: 1px solid #0f3460;
+        }
+        .btn:hover { background: #0f3460; color: #fff; }
+        .btn:disabled { opacity: 0.4; cursor: default; }
+        .btn:disabled:hover { background: #16213e; color: #ddd; }
+        .btn-bfs { border-color: #4fc3f7; color: #4fc3f7; }
+        .btn-bfs:hover { background: #4fc3f7; color: #1a1a2e; }
+        .btn-dfs { border-color: #ffa726; color: #ffa726; }
+        .btn-dfs:hover { background: #ffa726; color: #1a1a2e; }
+        .btn-reset { border-color: #e94560; color: #e94560; }
+        .btn-reset:hover { background: #e94560; color: #fff; }
+        .btn-clear { border-color: #888; color: #888; }
+        .btn-clear:hover:not(:disabled) { background: #888; color: #1a1a2e; }
+        .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        /* ---- tiny reactive framework ---- */
+
+        function h(tag, props) {
+            var children = [];
+            for (var i = 2; i < arguments.length; i++) {
+                var arg = arguments[i];
+                if (Array.isArray(arg)) for (var j = 0; j < arg.length; j++) children.push(arg[j]);
+                else children.push(arg);
+            }
+            return { tag: tag, props: props || {}, children: children };
+        }
+
+        function mount(vnode) {
+            if (typeof vnode === 'string' || typeof vnode === 'number')
+                return document.createTextNode(vnode);
+            if (vnode == null || vnode === false || vnode === true)
+                return document.createTextNode('');
+            if (typeof vnode.tag === 'function')
+                return mount(vnode.tag(vnode.props));
+            var el = document.createElement(vnode.tag);
+            for (var k in vnode.props) {
+                var v = vnode.props[k];
+                if (k === 'className') el.className = v;
+                else if (k === 'disabled') el.disabled = v;
+                else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
+                else if (k === 'style' && typeof v === 'object') for (var s in v) el.style[s] = v[s];
+                else el.setAttribute(k, v);
+            }
+            for (var i = 0; i < vnode.children.length; i++)
+                el.appendChild(mount(vnode.children[i]));
+            return el;
+        }
+
+        function render(vtree, container) {
+            container.textContent = '';
+            container.appendChild(mount(vtree));
+        }
+
+        function atom(initial) {
+            var value = initial;
+            var subs = [];
+            return {
+                get val() { return value; },
+                set val(v) {
+                    var nv = typeof v === 'function' ? v(value) : v;
+                    if (nv !== value) { value = nv; for (var i = 0; i < subs.length; i++) subs[i](); }
+                }
+            };
+        }
+
+        /* ---- maze ---- */
+
+        var ROWS = 12, COLS = 12, CELL = 35;
+
+        function generateMaze(rows, cols) {
+            var grid = [];
+            for (var r = 0; r < rows; r++) {
+                grid[r] = [];
+                for (var c = 0; c < cols; c++)
+                    grid[r][c] = { row: r, col: c, walls: [true, true, true, true], visited: false };
+            }
+            function removeWall(r1, c1, r2, c2) {
+                if (r1 === r2) {
+                    if (c1 < c2) { grid[r1][c1].walls[1] = false; grid[r2][c2].walls[3] = false; }
+                    else { grid[r1][c1].walls[3] = false; grid[r2][c2].walls[1] = false; }
+                } else {
+                    if (r1 < r2) { grid[r1][c1].walls[2] = false; grid[r2][c2].walls[0] = false; }
+                    else { grid[r1][c1].walls[0] = false; grid[r2][c2].walls[2] = false; }
+                }
+            }
+            var stack = [grid[0][0]];
+            grid[0][0].visited = true;
+            while (stack.length) {
+                var cur = stack[stack.length - 1];
+                var nn = [];
+                if (cur.row > 0 && !grid[cur.row-1][cur.col].visited) nn.push(grid[cur.row-1][cur.col]);
+                if (cur.row < rows-1 && !grid[cur.row+1][cur.col].visited) nn.push(grid[cur.row+1][cur.col]);
+                if (cur.col > 0 && !grid[cur.row][cur.col-1].visited) nn.push(grid[cur.row][cur.col-1]);
+                if (cur.col < cols-1 && !grid[cur.row][cur.col+1].visited) nn.push(grid[cur.row][cur.col+1]);
+                if (nn.length) {
+                    var next = nn[Math.floor(Math.random() * nn.length)];
+                    removeWall(cur.row, cur.col, next.row, next.col);
+                    next.visited = true;
+                    stack.push(next);
+                } else stack.pop();
+            }
+            return grid;
+        }
+
+        function getNeighbors(grid, r, c) {
+            var n = [];
+            var cell = grid[r][c];
+            if (!cell.walls[0] && r > 0) n.push(grid[r-1][c]);
+            if (!cell.walls[1] && c < grid[0].length-1) n.push(grid[r][c+1]);
+            if (!cell.walls[2] && r < grid.length-1) n.push(grid[r+1][c]);
+            if (!cell.walls[3] && c > 0) n.push(grid[r][c-1]);
+            return n;
+        }
+
+        function bfs(grid, rows, cols) {
+            var start = grid[0][0], end = grid[rows-1][cols-1];
+            var visited = [];
+            var parent = [];
+            for (var r = 0; r < rows; r++) { visited[r] = []; parent[r] = []; for (var c = 0; c < cols; c++) { visited[r][c] = false; parent[r][c] = null; } }
+            var queue = [start];
+            visited[0][0] = true;
+            var head = 0;
+            while (head < queue.length) {
+                var cur = queue[head++];
+                if (cur === end) break;
+                var nbrs = getNeighbors(grid, cur.row, cur.col);
+                for (var i = 0; i < nbrs.length; i++) {
+                    var nb = nbrs[i];
+                    if (!visited[nb.row][nb.col]) {
+                        visited[nb.row][nb.col] = true;
+                        parent[nb.row][nb.col] = cur;
+                        queue.push(nb);
+                    }
+                }
+            }
+            var path = [];
+            var cur2 = end;
+            while (cur2) { path.unshift(cur2); cur2 = parent[cur2.row][cur2.col]; }
+            return path[0] === start ? path : null;
+        }
+
+        function dfs(grid, rows, cols) {
+            var start = grid[0][0], end = grid[rows-1][cols-1];
+            var visited = [];
+            var parent = [];
+            for (var r = 0; r < rows; r++) { visited[r] = []; parent[r] = []; for (var c = 0; c < cols; c++) { visited[r][c] = false; parent[r][c] = null; } }
+            var stack = [start];
+            visited[0][0] = true;
+            while (stack.length) {
+                var cur = stack.pop();
+                if (cur === end) break;
+                var nbrs = getNeighbors(grid, cur.row, cur.col);
+                for (var i = 0; i < nbrs.length; i++) {
+                    var nb = nbrs[i];
+                    if (!visited[nb.row][nb.col]) {
+                        visited[nb.row][nb.col] = true;
+                        parent[nb.row][nb.col] = cur;
+                        stack.push(nb);
+                    }
+                }
+            }
+            var path = [];
+            var cur2 = end;
+            while (cur2) { path.unshift(cur2); cur2 = parent[cur2.row][cur2.col]; }
+            return path[0] === start ? path : null;
+        }
+
+        function drawMaze(ctx, grid, rows, cols, path) {
+            var W = cols * CELL, H = rows * CELL;
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, W, H);
+            ctx.strokeStyle = '#0f3460';
+            ctx.lineWidth = 2;
+            for (var r = 0; r < rows; r++) {
+                for (var c = 0; c < cols; c++) {
+                    var cell = grid[r][c];
+                    var x = c * CELL, y = r * CELL;
+                    if (cell.walls[0]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + CELL, y); ctx.stroke(); }
+                    if (cell.walls[1]) { ctx.beginPath(); ctx.moveTo(x + CELL, y); ctx.lineTo(x + CELL, y + CELL); ctx.stroke(); }
+                    if (cell.walls[2]) { ctx.beginPath(); ctx.moveTo(x, y + CELL); ctx.lineTo(x + CELL, y + CELL); ctx.stroke(); }
+                    if (cell.walls[3]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + CELL); ctx.stroke(); }
+                }
+            }
+            ctx.fillStyle = '#00cc66';
+            ctx.fillRect(4, 4, CELL - 8, CELL - 8);
+            ctx.fillStyle = '#e94560';
+            ctx.fillRect((cols-1)*CELL + 4, (rows-1)*CELL + 4, CELL - 8, CELL - 8);
+            if (path) {
+                ctx.strokeStyle = '#4fc3f7';
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                for (var i = 0; i < path.length; i++) {
+                    var cx = path[i].col * CELL + CELL / 2;
+                    var cy = path[i].row * CELL + CELL / 2;
+                    i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
+                }
+                ctx.stroke();
+            }
+        }
+
+        /* ---- app ---- */
+
+        function App() {
+            var gridAtom = atom(generateMaze(ROWS, COLS));
+            var pathAtom = atom(null);
+            var statsAtom = atom('');
+
+            var container = document.getElementById('root');
+            var W = COLS * CELL, H = ROWS * CELL;
+
+            function draw() {
+                var canvas = container.querySelector('canvas');
+                if (!canvas) return;
+                drawMaze(canvas.getContext('2d'), gridAtom.val, ROWS, COLS, pathAtom.val);
+            }
+
+            function refresh() {
+                var tree = h('div', { className: 'd-flex flex-column align-items-center' },
+                    h('h1', null, 'Laberinto'),
+                    h('p', { style: { fontSize: '0.9rem', marginBottom: '0.5rem', color: '#888' } },
+                        ROWS + '\u00d7' + COLS + ' \u00b7 ',
+                        h('span', { style: { color: '#00cc66' } }, '\u25a0'),
+                        ' inicio \u00b7 ',
+                        h('span', { style: { color: '#e94560' } }, '\u25a0'),
+                        ' meta'
+                    ),
+                    h('canvas', {
+                        width: W,
+                        height: H,
+                        style: { background: '#1a1a2e', borderRadius: '12px', display: 'block', margin: '0 auto 1rem', border: '1px solid #0f3460' }
+                    }),
+                    h('div', { className: 'btn-group' },
+                        h('button', { className: 'btn btn-bfs', onClick: function() {
+                            var start = performance.now();
+                            var p = bfs(gridAtom.val, ROWS, COLS);
+                            var elapsed = ((performance.now() - start) / 1000).toFixed(3);
+                            pathAtom.val = p;
+                            statsAtom.val = p ? 'BFS \u2014 ' + (p.length-1) + ' pasos en ' + elapsed + 's' : 'BFS \u2014 sin soluci\u00f3n';
+                            refresh();
+                        }}, 'Resolver Amplitud (BFS)'),
+                        h('button', { className: 'btn btn-dfs', onClick: function() {
+                            var start = performance.now();
+                            var p = dfs(gridAtom.val, ROWS, COLS);
+                            var elapsed = ((performance.now() - start) / 1000).toFixed(3);
+                            pathAtom.val = p;
+                            statsAtom.val = p ? 'DFS \u2014 ' + (p.length-1) + ' pasos en ' + elapsed + 's' : 'DFS \u2014 sin soluci\u00f3n';
+                            refresh();
+                        }}, 'Resolver Profundidad (DFS)'),
+                        h('button', { className: 'btn btn-reset', onClick: function() {
+                            gridAtom.val = generateMaze(ROWS, COLS);
+                            pathAtom.val = null;
+                            statsAtom.val = '';
+                            refresh();
+                        }}, 'Reset'),
+                        h('button', { className: 'btn btn-clear', disabled: pathAtom.val === null, onClick: function() {
+                            pathAtom.val = null;
+                            statsAtom.val = '';
+                            refresh();
+                        }}, 'Limpiar')
+                    ),
+                    h('div', { className: 'stats' }, statsAtom.val)
+                );
+                render(tree, container);
+                draw();
+            }
+
+            refresh();
+        }
+
+        App();
+    </script>
+</body>
+</html>

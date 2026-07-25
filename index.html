@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>reactic — ejercicios con React</title>
+    <title>reactic — ejercicios con React y JavaScript</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
@@ -140,15 +140,15 @@
 <body>
     <main>
         <h1>reactic</h1>
-        <p class="sub">Ejercicios progresivos de React con distintas herramientas</p>
+        <p class="sub">Ejercicios progresivos de Tic Tac Toe con React y JavaScript vanilla</p>
 
         <div class="desc">
-            <p><strong>Tres en Raya</strong> — implementación clásica del Tic Tac Toe con React 18:</p>
+            <p><strong>Tres en Raya</strong> — implementación clásica del Tic Tac Toe:</p>
             <p style="margin-top:0.5rem;">
                 estado compartido con <code>useState</code>, historial de movimientos,
                 navegación entre turnos, detección de ganador con líneas ganadoras
                 resaltadas, control de empate y botón de reinicio.
-                Se recorren tres versiones que evolucionan el stack de estilos y tipado.
+                Se recorren seis versiones que evolucionan el stack de estilos y tipado.
             </p>
 
         </div>
@@ -184,6 +184,34 @@
                     </div>
                 </a>
             </li>
+            <li>
+                <a href="tic04.html">
+                    <div class="title">tic04.html - Tic Tac Toe — Bootstrap + TypeScript</div>
+                    <div class="meta">
+                        <span class="badge badge-bs">Bootstrap</span>
+                        <span class="badge badge-ts">TypeScript</span>
+                        Misma lógica con Bootstrap 5 vía CDN y tipado estático con TypeScript
+                    </div>
+                </a>
+            </li>
+            <li>
+                <a href="tic05.html">
+                    <div class="title">tic05.html - Tic Tac Toe — JavaScript puro</div>
+                    <div class="meta">
+                        <span class="badge badge-css">CSS</span>
+                        Sin librerías ni CDN. Toda la lógica con DOM API vanilla, historial de movimientos y detección de ganador
+                    </div>
+                </a>
+            </li>
+            <li>
+                <a href="tic06.html">
+                    <div class="title">tic06.html - Tic Tac Toe — Reactivo + Declarativo</div>
+                    <div class="meta">
+                        <span class="badge badge-css">CSS</span>
+                        Mini framework reactivo propio: <code>h()</code> (vdom), <code>atom</code> (estado reactivo), componentes puros sin CDN
+                    </div>
+                </a>
+            </li>
         </ul>
         <div class="desc">
             <p style="margin-top:0.75rem;">
@@ -204,7 +232,38 @@
             </li>
         </ul>
 
-        <p class="footer">React 18 &middot; CDN &middot; sin empaquetadores</p>
+        <div class="desc" style="margin-top:1rem;">
+            <p><strong>Laberinto</strong> — generación y resolución de laberintos con React:</p>
+            <p style="margin-top:0.5rem;">
+                algoritmo <em>recursive backtracker</em> para generar el laberinto,
+                BFS (amplitud) y DFS (profundidad) para resolverlo, con dibujo en canvas
+                y medición de tiempo de ejecución.
+            </p>
+        </div>
+
+        <ul class="list">
+            <li>
+                <a href="lab01.html">
+                    <div class="title">lab01.html - Laberinto — Bootstrap + React</div>
+                    <div class="meta">
+                        <span class="badge badge-bs">Bootstrap</span>
+                        <span class="badge badge-babel">Babel</span>
+                        Generación con recursive backtracker, solución BFS/DFS, dibujo en canvas
+                    </div>
+                </a>
+            </li>
+            <li>
+                <a href="lb02.html">
+                    <div class="title">lb02.html - Laberinto — Framework reactivo propio</div>
+                    <div class="meta">
+                        <span class="badge badge-css">CSS</span>
+                        Misma lógica con <code>h()</code>, <code>atom</code> y componentes puros; sin CDNs
+                    </div>
+                </a>
+            </li>
+        </ul>
+
+        <p class="footer">React 18 &middot; vanilla JS &middot; TypeScript &middot; Bootstrap &middot; CDN &middot; sin empaquetadores</p>
     </main>
 </body>
 

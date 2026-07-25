@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tres en Raya - Tic Tac Toe</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #eee;
+        }
+        #root { text-align: center; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; color: #e94560; }
+        .status {
+            font-size: 1.25rem; margin-bottom: 1rem; padding: 0.5rem 1rem;
+            border-radius: 8px; display: inline-block;
+        }
+        .winner { background: #0f3460; color: #e94560; font-weight: bold; }
+        .turn { background: #16213e; }
+        .board {
+            display: grid; grid-template-columns: repeat(3, 100px); gap: 4px;
+            background: #0f3460; padding: 4px; border-radius: 12px; margin: 0 auto 1rem;
+        }
+        .cell {
+            width: 100px; height: 100px; background: #1a1a2e; border: none;
+            font-size: 2.5rem; font-weight: bold; color: #eee; cursor: pointer;
+            border-radius: 8px; transition: background 0.15s;
+        }
+        .cell:hover:not(:disabled) { background: #2a2a4e; }
+        .cell:disabled { cursor: default; opacity: 0.85; }
+        .cell.win-cell { background: #0f3460; color: #e94560; }
+        .reset {
+            background: #e94560; color: #fff; border: none; padding: 0.65rem 2rem;
+            font-size: 1rem; border-radius: 8px; cursor: pointer; font-weight: 600;
+            transition: background 0.15s;
+        }
+        .reset:hover { background: #d63851; }
+        .history {
+            margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 4px;
+            justify-content: center; max-width: 320px; margin: 1rem auto 0;
+        }
+        .history button {
+            background: #16213e; color: #aaa; border: 1px solid #0f3460;
+            padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;
+        }
+        .history button:hover { background: #0f3460; color: #fff; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        /* ---- tiny reactive framework ---- */
+
+        function h(tag, props) {
+            var children = [];
+            for (var i = 2; i < arguments.length; i++) {
+                var arg = arguments[i];
+                if (Array.isArray(arg)) for (var j = 0; j < arg.length; j++) children.push(arg[j]);
+                else children.push(arg);
+            }
+            return { tag: tag, props: props || {}, children: children };
+        }
+
+        function mount(vnode) {
+            if (typeof vnode === 'string' || typeof vnode === 'number')
+                return document.createTextNode(vnode);
+            if (vnode == null || vnode === false || vnode === true)
+                return document.createTextNode('');
+            if (typeof vnode.tag === 'function')
+                return mount(vnode.tag(vnode.props));
+            var el = document.createElement(vnode.tag);
+            for (var k in vnode.props) {
+                var v = vnode.props[k];
+                if (k === 'className') el.className = v;
+                else if (k === 'disabled') el.disabled = v;
+                else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
+                else if (k === 'style' && typeof v === 'object') for (var s in v) el.style[s] = v[s];
+                else el.setAttribute(k, v);
+            }
+            for (var i = 0; i < vnode.children.length; i++)
+                el.appendChild(mount(vnode.children[i]));
+            return el;
+        }
+
+        function render(vtree, container) {
+            container.textContent = '';
+            container.appendChild(mount(vtree));
+        }
+
+        function atom(initial) {
+            var value = initial;
+            var subs = [];
+            return {
+                get val() { return value; },
+                set val(v) {
+                    var nv = typeof v === 'function' ? v(value) : v;
+                    if (nv !== value) { value = nv; for (var i = 0; i < subs.length; i++) subs[i](); }
+                }
+            };
+        }
+
+        function autorun(fn) {
+            fn();
+        }
+
+        /* ---- app ---- */
+
+        var lines = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
+        ];
+
+        function calculateWinner(squares) {
+            for (var i = 0; i < lines.length; i++) {
+                var a = lines[i][0], b = lines[i][1], c = lines[i][2];
+                if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c])
+                    return { winner: squares[a], line: lines[i] };
+            }
+            for (var i = 0; i < squares.length; i++) if (squares[i] === null) return null;
+            return { winner: 'empate', line: null };
+        }
+
+        function Square(props) {
+            return h('button',
+                {
+                    className: 'cell' + (props.isWinning ? ' win-cell' : ''),
+                    disabled: props.value !== null,
+                    onClick: props.onClick
+                },
+                props.value || ''
+            );
+        }
+
+        function Board(props) {
+            var cells = [];
+            for (var i = 0; i < 9; i++) {
+                cells.push(
+                    h(Square, {
+                        value: props.squares[i],
+                        isWinning: props.winLine && props.winLine.includes(i),
+                        onClick: function(idx) { return function() { props.onCellClick(idx); }; }(i)
+                    })
+                );
+            }
+            return h('div', { className: 'board' }, cells);
+        }
+
+        function App() {
+            var historyState = atom([Array(9).fill(null)]);
+            var currentMoveState = atom(0);
+
+            var container = document.getElementById('root');
+
+            function refresh() {
+                var squares = historyState.val[currentMoveState.val];
+                var xIsNext = currentMoveState.val % 2 === 0;
+                var result = calculateWinner(squares);
+                var gameOver = result !== null;
+
+                var statusText, statusClass = 'status';
+                if (gameOver) {
+                    if (result.winner === 'empate') {
+                        statusText = '\u00a1Empate!';
+                        statusClass += ' turn';
+                    } else {
+                        statusText = 'Ganador: ' + result.winner;
+                        statusClass += ' winner';
+                    }
+                } else {
+                    statusText = 'Turno de: ' + (xIsNext ? 'X' : 'O');
+                    statusClass += ' turn';
+                }
+
+                var historyButtons = [];
+                if (historyState.val.length > 1) {
+                    for (var m = 0; m < historyState.val.length; m++) {
+                        historyButtons.push(
+                            h('button',
+                                {
+                                    onClick: function(move) { return function() {
+                                        currentMoveState.val = move;
+                                        refresh();
+                                    }; }(m)
+                                },
+                                m === 0 ? 'Ir al inicio' : 'Ir al movimiento #' + m
+                            )
+                        );
+                    }
+                }
+
+                var tree = h('div', null,
+                    h('h1', null, 'Tres en Raya'),
+                    h('div', { className: statusClass }, statusText),
+                    h(Board, {
+                        squares: squares,
+                        winLine: result ? result.line : null,
+                        onCellClick: function(i) {
+                            if (gameOver || squares[i] !== null) return;
+                            var next = squares.slice();
+                            next[i] = xIsNext ? 'X' : 'O';
+                            var hist = historyState.val.slice(0, currentMoveState.val + 1).concat([next]);
+                            historyState.val = hist;
+                            currentMoveState.val = hist.length - 1;
+                            refresh();
+                        }
+                    }),
+                    h('button', { className: 'reset', onClick: function() {
+                        historyState.val = [Array(9).fill(null)];
+                        currentMoveState.val = 0;
+                        refresh();
+                    }}, 'Reiniciar'),
+                    historyButtons.length > 0
+                        ? h('div', { className: 'history' }, historyButtons)
+                        : null
+                );
+
+                render(tree, container);
+            }
+
+            refresh();
+        }
+
+        App();
+    </script>
+</body>
+</html>
