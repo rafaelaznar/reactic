@@ -66,10 +66,9 @@
 <body class="d-flex align-items-center justify-content-center min-vh-100">
     <div id="root"></div>
 
-    <script src="https://unpkg.com/preact@10.26.4/dist/preact.min.js"></script>
-
-    <script>
-        const { h, Fragment, Component } = preact;
+    <script type="module">
+        import { h, Fragment, render } from 'https://esm.sh/preact@10.26.4';
+        import { useState } from 'https://esm.sh/preact@10.26.4/hooks';
 
         const Square = (props) =>
             h('button', {
@@ -104,96 +103,76 @@
             return null;
         };
 
-        class Game extends Component {
-            constructor() {
-                super();
-                this.state = {
-                    history: [Array(9).fill(null)],
-                    currentMove: 0,
-                };
-            }
+        const Game = () => {
+            const [history, setHistory] = useState([Array(9).fill(null)]);
+            const [currentMove, setCurrentMove] = useState(0);
 
-            currentSquares() {
-                return this.state.history[this.state.currentMove];
-            }
+            const squares = history[currentMove];
+            const xIsNext = currentMove % 2 === 0;
+            const result = calculateWinner(squares);
+            const gameOver = result !== null;
 
-            xIsNext() {
-                return this.state.currentMove % 2 === 0;
-            }
+            const handleSquareClick = (i) => {
+                if (gameOver || squares[i] !== null) return;
+                const nextSquares = squares.slice();
+                nextSquares[i] = xIsNext ? 'X' : 'O';
+                const nextHistory = [...history.slice(0, currentMove + 1), nextSquares];
+                setHistory(nextHistory);
+                setCurrentMove(nextHistory.length - 1);
+            };
 
-            handleSquareClick(i) {
-                if (this._result || this.currentSquares()[i] !== null) return;
-                const nextSquares = this.currentSquares().slice();
-                nextSquares[i] = this.xIsNext() ? 'X' : 'O';
-                const nextHistory = [...this.state.history.slice(0, this.state.currentMove + 1), nextSquares];
-                this.setState({
-                    history: nextHistory,
-                    currentMove: nextHistory.length - 1,
-                });
-            }
+            const jumpTo = (move) => setCurrentMove(move);
 
-            jumpTo(move) {
-                this.setState({ currentMove: move });
-            }
+            const resetGame = () => {
+                setHistory([Array(9).fill(null)]);
+                setCurrentMove(0);
+            };
 
-            resetGame() {
-                this.setState({
-                    history: [Array(9).fill(null)],
-                    currentMove: 0,
-                });
-            }
-
-            render() {
-                const result = calculateWinner(this.currentSquares());
-                this._result = result;
-                const gameOver = result !== null;
-
-                let status, statusClass = 'status-badge bg-dark';
-                if (gameOver) {
-                    if (result.winner === 'empate') {
-                        status = '\u00a1Empate!';
-                        statusClass = 'status-badge bg-secondary';
-                    } else {
-                        status = 'Ganador: ' + result.winner;
-                        statusClass = 'status-badge bg-danger';
-                    }
+            let status, statusClass = 'status-badge bg-dark';
+            if (gameOver) {
+                if (result.winner === 'empate') {
+                    status = '\u00a1Empate!';
+                    statusClass = 'status-badge bg-secondary';
                 } else {
-                    status = 'Turno de: ' + (this.xIsNext() ? 'X' : 'O');
+                    status = 'Ganador: ' + result.winner;
+                    statusClass = 'status-badge bg-danger';
                 }
-
-                const moves = this.state.history.length > 1
-                    ? this.state.history.map((_, move) =>
-                        h('button', {
-                            key: move,
-                            className: 'btn-hist',
-                            onClick: () => this.jumpTo(move),
-                        }, move === 0 ? 'Ir al inicio' : 'Ir al movimiento #' + move)
-                    )
-                    : [];
-
-                const children = [
-                    h('h1', { className: 'text-danger mb-2', style: { color: '#e94560' } }, 'Tres en Raya'),
-                    h('div', { className: statusClass }, status),
-                    h(Board, {
-                        squares: this.currentSquares(),
-                        winLine: result ? result.line : null,
-                        onCellClick: (i) => this.handleSquareClick(i),
-                    }),
-                    h('button', {
-                        className: 'btn btn-danger px-4 py-2 fw-semibold',
-                        onClick: () => this.resetGame(),
-                    }, 'Reiniciar'),
-                ];
-
-                if (moves.length) {
-                    children.push(h('div', { className: 'history-wrap' }, moves));
-                }
-
-                return h(Fragment, null, children);
+            } else {
+                status = 'Turno de: ' + (xIsNext ? 'X' : 'O');
             }
-        }
 
-        preact.render(h(Game), document.getElementById('root'));
+            const moves = history.length > 1
+                ? history.map((_, move) =>
+                    h('button', {
+                        key: move,
+                        className: 'btn-hist',
+                        onClick: () => jumpTo(move),
+                    }, move === 0 ? 'Ir al inicio' : 'Ir al movimiento #' + move)
+                )
+                : [];
+
+            const children = [
+                h('h1', { className: 'text-danger mb-2', style: { color: '#e94560' } }, 'Tres en Raya'),
+                h('div', { className: statusClass }, status),
+                h(Board, {
+                    squares,
+                    winLine: result ? result.line : null,
+                    onCellClick: handleSquareClick,
+                }),
+                h('button', {
+                    className: 'btn btn-danger px-4 py-2 fw-semibold',
+                    onClick: resetGame,
+                }, 'Reiniciar'),
+            ];
+
+            if (moves.length) {
+                children.push(h('div', { className: 'history-wrap' }, moves));
+            }
+
+            return h(Fragment, null, children);
+        };
+
+        render(h(Game), document.getElementById('root'));
     </script>
 </body>
 </html>
