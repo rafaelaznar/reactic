@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carrito de Compras — Preact + HTM + Bootstrap</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #f0f2f5; color: #1a1a1a; font-family: system-ui, -apple-system, sans-serif; }
+        #root { padding: 2rem 1.5rem; max-width: 1100px; margin: 0 auto; }
+        .product-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: box-shadow 0.2s, border-color 0.2s;
+        }
+        .product-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            border-color: #ccc;
+        }
+        .cart-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            position: sticky;
+            top: 1.5rem;
+        }
+        .cart-item {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 0.6rem 0.8rem;
+            transition: background 0.15s;
+        }
+        .cart-item:hover { background: #f0f0f0; }
+        .qty-btn {
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            border: 2px solid #ccc;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background 0.15s, border-color 0.15s;
+            padding: 0;
+            line-height: 1;
+        }
+        .qty-btn:hover { background: #e9ecef; border-color: #999; }
+        .qty-btn:active { background: #dee2e6; }
+        .total-bar {
+            background: linear-gradient(135deg, #198754, #0dcaf0);
+            border-radius: 10px;
+            color: #fff;
+            padding: 1rem 1.25rem;
+        }
+        .empty-cart {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #aaa;
+        }
+        .badge-qty {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #198754;
+            color: #fff;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="module">
+        import { h, Fragment, render } from 'https://esm.sh/preact@10.26.4';
+        import { useReducer } from 'https://esm.sh/preact@10.26.4/hooks';
+        import htm from 'https://esm.sh/htm@3.1.1';
+
+        const html = htm.bind(h);
+
+        // ── Productos predefinidos ──────────────────────────────────
+        const PRODUCTS = [
+            { id: 1, name: 'Teclado mecánico', price: 89.99, emoji: '⌨️' },
+            { id: 2, name: 'Monitor 27" 4K', price: 399.99, emoji: '🖥️' },
+            { id: 3, name: 'Ratón inalámbrico', price: 49.99, emoji: '🖱️' },
+            { id: 4, name: 'Auriculares Bluetooth', price: 129.99, emoji: '🎧' },
+            { id: 5, name: 'Webcam HD 1080p', price: 69.99, emoji: '📷' },
+            { id: 6, name: 'Hub USB-C 7 puertos', price: 34.99, emoji: '🔌' },
+        ];
+
+        // ── Tipos de acción ─────────────────────────────────────────
+        const ACTIONS = {
+            ADD: 'ADD',
+            INCREASE: 'INCREASE',
+            DECREASE: 'DECREASE',
+            REMOVE: 'REMOVE',
+            CLEAR: 'CLEAR',
+        };
+
+        // ── Reducer ─────────────────────────────────────────────────
+        function cartReducer(state, action) {
+            switch (action.type) {
+                case ACTIONS.ADD: {
+                    const existing = state.find(item => item.id === action.payload.id);
+                    if (existing) {
+                        return state.map(item =>
+                            item.id === action.payload.id
+                                ? { ...item, quantity: item.quantity + 1 }
+                                : item
+                        );
+                    }
+                    return [...state, { ...action.payload, quantity: 1 }];
+                }
+                case ACTIONS.INCREASE:
+                    return state.map(item =>
+                        item.id === action.payload
+                            ? { ...item, quantity: item.quantity + 1 }
+                            : item
+                    );
+                case ACTIONS.DECREASE: {
+                    const item = state.find(i => i.id === action.payload);
+                    if (item && item.quantity === 1) {
+                        return state.filter(i => i.id !== action.payload);
+                    }
+                    return state.map(item =>
+                        item.id === action.payload
+                            ? { ...item, quantity: item.quantity - 1 }
+                            : item
+                    );
+                }
+                case ACTIONS.REMOVE:
+                    return state.filter(item => item.id !== action.payload);
+                case ACTIONS.CLEAR:
+                    return [];
+                default:
+                    return state;
+            }
+        }
+
+        // ── ProductCard ─────────────────────────────────────────────
+        function ProductCard({ product, cartItem, dispatch }) {
+            const inCart = Boolean(cartItem);
+
+            return html`
+                <div class="product-card d-flex align-items-center gap-3">
+                    <span style="font-size:2rem">${product.emoji}</span>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">${product.name}</div>
+                        <div class="text-success fw-bold fs-5">$${product.price.toFixed(2)}</div>
+                    </div>
+                    ${inCart && html`
+                        <span class="badge-qty me-1">${cartItem.quantity}</span>
+                    `}
+                    <button
+                        class="btn btn-outline-success btn-sm px-3"
+                        onClick=${() => dispatch({ type: ACTIONS.ADD, payload: product })}
+                    >
+                        <i class="bi bi-cart-plus me-1"></i>Agregar
+                    </button>
+                </div>
+            `;
+        }
+
+        // ── CartItem ────────────────────────────────────────────────
+        function CartItem({ item, dispatch }) {
+            return html`
+                <div class="cart-item d-flex align-items-center gap-2">
+                    <span style="font-size:1.3rem">${item.emoji}</span>
+                    <div class="flex-grow-1" style="min-width:0">
+                        <div class="fw-medium text-truncate small">${item.name}</div>
+                        <div class="text-muted" style="font-size:0.8rem">
+                            $${item.price.toFixed(2)} c/u
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <button
+                            class="qty-btn"
+                            onClick=${() => dispatch({ type: ACTIONS.DECREASE, payload: item.id })}
+                            title="Disminuir"
+                        >−</button>
+                        <span class="fw-semibold px-1" style="min-width:1.5rem;text-align:center">
+                            ${item.quantity}
+                        </span>
+                        <button
+                            class="qty-btn"
+                            onClick=${() => dispatch({ type: ACTIONS.INCREASE, payload: item.id })}
+                            title="Aumentar"
+                        >+</button>
+                    </div>
+                    <button
+                        class="btn btn-sm text-danger border-0"
+                        onClick=${() => dispatch({ type: ACTIONS.REMOVE, payload: item.id })}
+                        title="Eliminar"
+                    >
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        // ── App principal ───────────────────────────────────────────
+        function App() {
+            const [cart, dispatch] = useReducer(cartReducer, []);
+
+            const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+            const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+            const getCartItem = (productId) => cart.find(i => i.id === productId);
+
+            return html`
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <h1 class="fs-4 fw-semibold mb-1">
+                            <i class="bi bi-shop me-2"></i>Tienda
+                        </h1>
+                        <p class="text-muted small mb-4">Preact + HTM + Bootstrap · useReducer</p>
+
+                        <div class="d-flex flex-column gap-3">
+                            ${PRODUCTS.map(product => html`
+                                <${ProductCard}
+                                    key=${product.id}
+                                    product=${product}
+                                    cartItem=${getCartItem(product.id)}
+                                    dispatch=${dispatch}
+                                />
+                            `)}
+                        </div>
+                    </div>
+
+                    <div class="col-lg-5">
+                        <div class="cart-card p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h2 class="fs-5 fw-semibold mb-0">
+                                    <i class="bi bi-cart3 me-2"></i>Carrito
+                                    ${totalItems > 0 && html`
+                                        <span class="badge bg-success ms-2">${totalItems}</span>
+                                    `}
+                                </h2>
+                                ${cart.length > 0 && html`
+                                    <button
+                                        class="btn btn-outline-danger btn-sm"
+                                        onClick=${() => dispatch({ type: ACTIONS.CLEAR })}
+                                        title="Vaciar carrito"
+                                    >
+                                        <i class="bi bi-x-circle me-1"></i>Vaciar
+                                    </button>
+                                `}
+                            </div>
+
+                            ${cart.length === 0 ? html`
+                                <div class="empty-cart">
+                                    <i class="bi bi-basket" style="font-size:2.5rem;display:block;margin-bottom:0.5rem"></i>
+                                    <p class="mb-0">El carrito está vacío</p>
+                                    <p class="small text-muted">Agrega productos desde la tienda</p>
+                                </div>
+                            ` : html`
+                                <div class="d-flex flex-column gap-2 mb-3">
+                                    ${cart.map(item => html`
+                                        <${CartItem} key=${item.id} item=${item} dispatch=${dispatch} />
+                                    `)}
+                                </div>
+                            `}
+
+                            ${cart.length > 0 && html`
+                                <div class="total-bar d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div style="font-size:0.75rem;opacity:0.85">Total</div>
+                                        <div class="fs-4 fw-bold">$${total.toFixed(2)}</div>
+                                    </div>
+                                    <button class="btn btn-light btn-sm px-3 fw-semibold">
+                                        <i class="bi bi-credit-card me-1"></i>Pagar
+                                    </button>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        render(html`<${App} />`, document.getElementById('root'));
+    </script>
+</body>
+</html>
