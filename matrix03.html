@@ -51,6 +51,7 @@
         .badge-integer { background: #9e6a03; }
         .badge-boolean { background: #cf222e; }
         .badge-boolean-false { background: #6e7681; }
+        .badge-id { background: #30363d; color: #58a6ff; font-weight: 600; }
         .form-control, .btn {
             border-radius: 8px;
         }
@@ -138,6 +139,7 @@
 
         // default new/empty row
         const emptyRow = () => ({
+            id: null,
             str: '',
             date: new Date().toISOString().slice(0, 10),
             decimal: 0,
@@ -187,7 +189,9 @@
         function Row({ row, onEdit, onDelete }) {
             return (
                 <tr>
-                    <td className="text-muted" style={{ fontSize: '0.8rem' }}>{row.id}</td>
+                    <td className="text-center">
+                        <span className="badge rounded-pill badge-id">{row.id}</span>
+                    </td>
                     <td>{row.str}</td>
                     <td>{row.date}</td>
                     <td className="text-end">{row.decimal.toFixed(2)}</td>
@@ -239,7 +243,7 @@
         function FormModal({ show, editingRow, formData, onFormChange, onSave, onClose }) {
             if (!show) return null;
 
-            const title = editingRow ? 'Editar registro' : 'Nuevo registro';
+            const title = editingRow ? `Editar registro #${editingRow.id}` : 'Nuevo registro';
 
             const handleSubmit = (e) => {
                 e.preventDefault();
@@ -369,6 +373,7 @@
             const handleEdit = React.useCallback((row) => {
                 setEditingRow(row);
                 setFormData({
+                    id: row.id,
                     str: row.str,
                     date: row.date,
                     decimal: row.decimal,
