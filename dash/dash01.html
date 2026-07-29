@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Ventas — React + JSX + Bootstrap + Chart.js</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #f0f2f5; color: #1a1a1a; font-family: system-ui, -apple-system, sans-serif; }
+        #root { padding: 2rem 1.5rem; max-width: 1200px; margin: 0 auto; }
+        .stat-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            transition: box-shadow 0.2s;
+        }
+        .stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+        .stat-icon {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+        .chart-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        .filter-bar {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+        // ── Datos simulados ──────────────────────────────────────────
+        const MONTHS = [
+            'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+            'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+        ];
+
+        function generateSalesData() {
+            return Array.from({ length: 12 }, (_, i) => ({
+                month: i,
+                label: MONTHS[i],
+                sales: Math.round(15000 + Math.random() * 35000),
+                orders: Math.round(80 + Math.random() * 120),
+                customers: Math.round(50 + Math.random() * 100),
+            }));
+        }
+
+        // ── Componentes ──────────────────────────────────────────────
+        function StatCard({ title, value, icon, color, prefix, suffix }) {
+            return (
+                <div className="stat-card d-flex align-items-center gap-3">
+                    <div className="stat-icon" style={{ background: color + '20', color }}>
+                        <i className={`bi bi-${icon}`}></i>
+                    </div>
+                    <div>
+                        <div className="text-muted small">{title}</div>
+                        <div className="fw-bold fs-4">
+                            {prefix || ''}{typeof value === 'number' ? value.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}{suffix || ''}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function SalesChart({ data }) {
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+
+            useEffect(() => {
+                if (chartRef.current) {
+                    chartRef.current.destroy();
+                }
+
+                const ctx = canvasRef.current.getContext('2d');
+                chartRef.current = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => d.label),
+                        datasets: [{
+                            label: 'Ventas ($)',
+                            data: data.map(d => d.sales),
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'rgba(13,110,253,0.08)',
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#0d6efd',
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ` $${ctx.raw.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`,
+                                },
+                            },
+                        },
+                        scales: {
+                            y: {
+                                ticks: { callback: v => '$' + (v / 1000).toFixed(0) + 'k' },
+                                grid: { color: '#f0f0f0' },
+                            },
+                            x: { grid: { display: false } },
+                        },
+                    },
+                });
+
+                return () => { if (chartRef.current) chartRef.current.destroy(); };
+            }, [data]);
+
+            return (
+                <div style={{ position: 'relative', height: '320px', width: '100%' }}>
+                    <canvas ref={canvasRef}></canvas>
+                </div>
+            );
+        }
+
+        function OrdersChart({ data }) {
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+
+            useEffect(() => {
+                if (chartRef.current) chartRef.current.destroy();
+
+                const ctx = canvasRef.current.getContext('2d');
+                chartRef.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(d => d.label),
+                        datasets: [
+                            {
+                                label: 'Pedidos',
+                                data: data.map(d => d.orders),
+                                backgroundColor: 'rgba(13,110,253,0.7)',
+                                borderRadius: 6,
+                            },
+                            {
+                                label: 'Clientes',
+                                data: data.map(d => d.customers),
+                                backgroundColor: 'rgba(102,16,242,0.55)',
+                                borderRadius: 6,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' },
+                        },
+                        scales: {
+                            y: {
+                                grid: { color: '#f0f0f0' },
+                                beginAtZero: false,
+                            },
+                            x: { grid: { display: false } },
+                        },
+                    },
+                });
+
+                return () => { if (chartRef.current) chartRef.current.destroy(); };
+            }, [data]);
+
+            return (
+                <div style={{ position: 'relative', height: '320px', width: '100%' }}>
+                    <canvas ref={canvasRef}></canvas>
+                </div>
+            );
+        }
+
+        function MonthRangeFilter({ fromMonth, toMonth, onFromChange, onToChange }) {
+            return (
+                <div className="filter-bar d-flex flex-wrap align-items-center gap-3">
+                    <div className="d-flex align-items-center gap-2">
+                        <label className="form-label mb-0 text-muted small fw-semibold text-nowrap">
+                            <i className="bi bi-calendar-range me-1"></i>Desde
+                        </label>
+                        <select
+                            className="form-select form-select-sm"
+                            style={{ width: 'auto' }}
+                            value={fromMonth}
+                            onChange={e => onFromChange(Number(e.target.value))}
+                        >
+                            {MONTHS.map((m, i) => (
+                                <option key={i} value={i}>{m}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                        <label className="form-label mb-0 text-muted small fw-semibold text-nowrap">
+                            <i className="bi bi-calendar-check me-1"></i>Hasta
+                        </label>
+                        <select
+                            className="form-select form-select-sm"
+                            style={{ width: 'auto' }}
+                            value={toMonth}
+                            onChange={e => onToChange(Number(e.target.value))}
+                        >
+                            {MONTHS.map((m, i) => (
+                                <option key={i} value={i}>{m}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <span className="text-muted small ms-auto">
+                        Mostrando {MONTHS[fromMonth]} – {MONTHS[toMonth]}
+                    </span>
+                </div>
+            );
+        }
+
+        function DataTable({ data }) {
+            return (
+                <div className="table-responsive">
+                    <table className="table table-hover align-middle mb-0">
+                        <thead className="table-light">
+                            <tr>
+                                <th className="small text-muted">Mes</th>
+                                <th className="small text-muted text-end">Ventas</th>
+                                <th className="small text-muted text-end">Pedidos</th>
+                                <th className="small text-muted text-end">Clientes</th>
+                                <th className="small text-muted text-end">Ticket medio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.map(d => (
+                                <tr key={d.month}>
+                                    <td className="fw-medium">{d.label}</td>
+                                    <td className="text-end">${d.sales.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</td>
+                                    <td className="text-end">{d.orders}</td>
+                                    <td className="text-end">{d.customers}</td>
+                                    <td className="text-end fw-medium">
+                                        ${(d.sales / d.orders).toFixed(2)}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        function App() {
+            const [allData] = useState(() => generateSalesData());
+            const [fromMonth, setFromMonth] = useState(0);
+            const [toMonth, setToMonth] = useState(11);
+
+            // useCallback para que MonthRangeFilter reciba referencias estables
+            const handleFromChange = useCallback((value) => {
+                setFromMonth(value);
+            }, []);
+
+            const handleToChange = useCallback((value) => {
+                setToMonth(value);
+            }, []);
+
+            // Asegurar que from <= to
+            useEffect(() => {
+                if (fromMonth > toMonth) {
+                    setFromMonth(toMonth);
+                }
+            }, [fromMonth, toMonth]);
+
+            // useMemo: filtrar datos según rango de meses
+            const filteredData = useMemo(() => {
+                return allData.filter(d => d.month >= fromMonth && d.month <= toMonth);
+            }, [allData, fromMonth, toMonth]);
+
+            // useMemo: estadísticas del período
+            const stats = useMemo(() => {
+                const totalSales = filteredData.reduce((s, d) => s + d.sales, 0);
+                const totalOrders = filteredData.reduce((s, d) => s + d.orders, 0);
+                const totalCustomers = filteredData.reduce((s, d) => s + d.customers, 0);
+                const avgTicket = totalOrders > 0 ? totalSales / totalOrders : 0;
+                const months = filteredData.length;
+                const bestMonth = filteredData.reduce((best, d) => d.sales > best.sales ? d : best, filteredData[0] || { label: '—', sales: 0 });
+                return { totalSales, totalOrders, totalCustomers, avgTicket, months, bestMonth };
+            }, [filteredData]);
+
+            return (
+                <div>
+                    {/* ── Cabecera ── */}
+                    <div className="d-flex flex-wrap justify-content-between align-items-start mb-4">
+                        <div>
+                            <h1 className="fs-4 fw-semibold mb-1">
+                                <i className="bi bi-speedometer2 me-2"></i>Dashboard de Ventas
+                            </h1>
+                            <p className="text-muted small mb-0">
+                                React + JSX + Bootstrap + Chart.js · <code>useState</code> <code>useEffect</code> <code>useMemo</code> <code>useCallback</code>
+                            </p>
+                        </div>
+                        <span className="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill">
+                            <i className="bi bi-database me-1"></i>Datos simulados 2026
+                        </span>
+                    </div>
+
+                    {/* ── Tarjetas de estadísticas ── */}
+                    <div className="row g-3 mb-4">
+                        <div className="col-6 col-md-3">
+                            <StatCard title="Ventas totales" value={stats.totalSales} icon="cash-stack" color="#0d6efd" prefix="$" />
+                        </div>
+                        <div className="col-6 col-md-3">
+                            <StatCard title={`Pedidos (${stats.months} meses)`} value={stats.totalOrders} icon="box-seam" color="#198754" />
+                        </div>
+                        <div className="col-6 col-md-3">
+                            <StatCard title="Ticket medio" value={stats.avgTicket} icon="receipt" color="#fd7e14" prefix="$" />
+                        </div>
+                        <div className="col-6 col-md-3">
+                            <StatCard title="Mejor mes" value={stats.bestMonth.label} icon="trophy" color="#6610f2" suffix={` — $${stats.bestMonth.sales.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`} />
+                        </div>
+                    </div>
+
+                    {/* ── Filtro de rango ── */}
+                    <div className="mb-4">
+                        <MonthRangeFilter
+                            fromMonth={fromMonth}
+                            toMonth={toMonth}
+                            onFromChange={handleFromChange}
+                            onToChange={handleToChange}
+                        />
+                    </div>
+
+                    {/* ── Gráficos ── */}
+                    <div className="row g-4 mb-4">
+                        <div className="col-lg-7">
+                            <div className="chart-card">
+                                <h2 className="fs-6 fw-semibold mb-3">
+                                    <i className="bi bi-graph-up-arrow me-2 text-primary"></i>Evolución de Ventas
+                                </h2>
+                                <SalesChart data={filteredData} />
+                            </div>
+                        </div>
+                        <div className="col-lg-5">
+                            <div className="chart-card">
+                                <h2 className="fs-6 fw-semibold mb-3">
+                                    <i className="bi bi-bar-chart me-2 text-primary"></i>Pedidos vs Clientes
+                                </h2>
+                                <OrdersChart data={filteredData} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── Tabla de datos ── */}
+                    <div className="chart-card">
+                        <h2 className="fs-6 fw-semibold mb-3">
+                            <i className="bi bi-table me-2 text-primary"></i>Detalle Mensual
+                        </h2>
+                        <DataTable data={filteredData} />
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
