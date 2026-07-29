@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wiki Local — Preact + HTM</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --sidebar-width: 320px;
+    }
+    body { background: #f8f9fa; }
+    .app-header {
+      background: linear-gradient(135deg, #2d6a4f 0%, #40916c 50%, #52b788 100%);
+      color: #fff;
+      position: sticky;
+      top: 0;
+      z-index: 1030;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+    .wiki-icon { width: 28px; height: 28px; margin-right: 10px; }
+    .breadcrumb-wiki {
+      background: #fff;
+      border-bottom: 1px solid #dee2e6;
+      padding: .5rem 1rem;
+      font-size: .875rem;
+      position: sticky;
+      top: 56px;
+      z-index: 1020;
+    }
+    .breadcrumb-wiki a {
+      color: #2d6a4f;
+      text-decoration: none;
+    }
+    .breadcrumb-wiki a:hover { text-decoration: underline; }
+    .main-layout {
+      display: flex;
+      min-height: calc(100vh - 106px);
+    }
+    .sidebar {
+      width: var(--sidebar-width);
+      background: #fff;
+      border-right: 1px solid #dee2e6;
+      overflow-y: auto;
+      position: sticky;
+      top: 90px;
+      height: calc(100vh - 90px);
+      flex-shrink: 0;
+    }
+    .content-area {
+      flex: 1;
+      max-width: 860px;
+      padding: 2rem;
+      margin: 0 auto;
+    }
+    .wiki-content h1 { font-size: 2rem; border-bottom: 2px solid #2d6a4f; padding-bottom: .5rem; margin-bottom: 1.5rem; }
+    .wiki-content h2 { font-size: 1.5rem; margin-top: 2rem; border-bottom: 1px solid #dee2e6; padding-bottom: .25rem; }
+    .wiki-content h3 { font-size: 1.25rem; margin-top: 1.5rem; }
+    .wiki-content pre { background: #f5f5f5; border-radius: 8px; padding: 1rem; }
+    .wiki-content code { font-size: .875rem; }
+    .wiki-content blockquote {
+      border-left: 4px solid #2d6a4f;
+      padding: .5rem 1rem;
+      margin: 1rem 0;
+      background: #f0faf5;
+      border-radius: 0 8px 8px 0;
+    }
+    .wiki-content table { width: 100%; margin: 1rem 0; }
+    .wiki-content table th { background: #f0faf5; }
+    .wiki-content img { max-width: 100%; border-radius: 8px; }
+    .wiki-content details {
+      border: 1px solid #dee2e6;
+      padding: .75rem 1rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+    }
+    .toc-link { color: #495057; text-decoration: none; display: block; padding: .25rem .5rem; border-radius: 4px; font-size: .875rem; }
+    .toc-link:hover { background: #e9ecef; color: #2d6a4f; }
+    .toc-link.toc-h2 { padding-left: 1.5rem; }
+    .toc-link.toc-h3 { padding-left: 2.5rem; }
+    .index-link { color: #495057; text-decoration: none; display: block; padding: .2rem .5rem; border-radius: 4px; font-size: .875rem; }
+    .index-link:hover { background: #e9ecef; color: #2d6a4f; }
+    .index-link.index-dir { font-weight: 600; color: #6c757d; }
+    .index-children { padding-left: 1rem; }
+    .placeholder-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      text-align: center;
+      color: #6c757d;
+    }
+    .placeholder-box .display-1 { font-size: 4rem; }
+    .toast-container { position: fixed; bottom: 1rem; right: 1rem; z-index: 9999; }
+    .btn-open-folder { transition: all .2s; }
+    .btn-open-folder:hover { transform: scale(1.05); }
+    @media (max-width: 768px) {
+      .main-layout { flex-direction: column; }
+      .sidebar {
+        width: 100%;
+        height: auto;
+        max-height: 40vh;
+        position: static;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+      }
+      .content-area { padding: 1rem; }
+    }
+    .editor-toolbar {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .5rem 0;
+      border-bottom: 1px solid #dee2e6;
+      margin-bottom: .5rem;
+    }
+    .editor-textarea {
+      width: 100%;
+      min-height: 60vh;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 1rem;
+      resize: vertical;
+      background: #fafafa;
+    }
+    .editor-textarea:focus {
+      outline: none;
+      border-color: #2d6a4f;
+      box-shadow: 0 0 0 3px rgba(45,106,79,.15);
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "preact": "https://esm.sh/preact@10.22.0",
+        "preact/hooks": "https://esm.sh/preact@10.22.0/hooks",
+        "htm/preact": "https://esm.sh/htm@3.1.1/preact"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import { h, render } from 'preact';
+    import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+    import { html } from 'htm/preact';
+
+    // ── Marked config ──────────────────────────────────────────
+    marked.setOptions({
+      gfm: true,
+      breaks: false,
+    });
+
+    // ── Helpers ────────────────────────────────────────────────
+    function slugify(text) {
+      return text
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-') || 'heading';
+    }
+
+    function resolvePath(base, rel) {
+      const parts = (base + '/' + rel).split('/');
+      const out = [];
+      for (const p of parts) {
+        if (p === '..') out.pop();
+        else if (p !== '.' && p !== '') out.push(p);
+      }
+      return out.join('/');
+    }
+
+    // ── SVG Icon strings (used in htm templates) ───────────────
+    const icoFolder   = html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+    const icoToc      = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`;
+    const icoIndex    = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="5" x2="3" y2="5"/><line x1="18" y1="10" x2="3" y2="10"/><line x1="14" y1="15" x2="3" y2="15"/><line x1="18" y1="20" x2="3" y2="20"/></svg>`;
+    const icoHome     = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
+    const icoTop      = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>`;
+    const icoWikiLogo = html`<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`;
+    const icoEdit     = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+    const icoSave     = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`;
+    const icoCancel   = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+    // ── Toast Component ────────────────────────────────────────
+    function Toast({ message, type, onClose }) {
+      useEffect(() => {
+        const t = setTimeout(onClose, 3000);
+        return () => clearTimeout(t);
+      }, [message]);
+      const cls = type === 'error' ? 'text-bg-danger' : 'text-bg-success';
+      return html`
+        <div class="toast show align-items-center ${cls} border-0" role="alert">
+          <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" onClick=${onClose}></button>
+          </div>
+        </div>
+      `;
+    }
+
+    // ── Sidebar TOC ───────────────────────────────────────────
+    function SidebarTOC({ headings, activeTab, setActiveTab }) {
+      return html`
+        <div class="d-flex flex-column h-100">
+          <ul class="nav nav-tabs nav-fill" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class=${`nav-link ${activeTab === 'toc' ? 'active' : ''}`} onClick=${() => setActiveTab('toc')}>
+                ${icoToc} <span class="ms-1 d-none d-md-inline">TOC</span>
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class=${`nav-link ${activeTab === 'index' ? 'active' : ''}`} onClick=${() => setActiveTab('index')}>
+                ${icoIndex} <span class="ms-1 d-none d-md-inline">Index</span>
+              </button>
+            </li>
+          </ul>
+          <div class="flex-grow-1 overflow-auto p-2">
+            ${activeTab === 'toc' && (headings.length === 0
+              ? html`<p class="text-muted small p-2">No headings on this page.</p>`
+              : headings.map(h => html`
+                  <a key=${h.id} href=${'#' + h.id} class=${`toc-link toc-h${h.level}`}
+                    onClick=${(e) => {
+                      e.preventDefault();
+                      document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth' });
+                    }}>
+                    ${h.text}
+                  </a>
+                `)
+            )}
+          </div>
+        </div>
+      `;
+    }
+
+    // ── Sidebar Index ─────────────────────────────────────────
+    function SidebarIndex({ tree, pages, onNavigate }) {
+      function renderTree(node, prefix = '') {
+        const keys = Object.keys(node).sort();
+        if (keys.length === 0) return null;
+        return html`
+          <ul class="list-unstyled mb-0">
+            ${keys.map(key => {
+              const path = prefix ? prefix + '/' + key : key;
+              const children = Object.keys(node[key]);
+              const isPage = pages.has(path);
+              return html`
+                <li key=${path}>
+                  ${isPage
+                    ? html`<a href="#" class="index-link" onClick=${(e) => { e.preventDefault(); onNavigate(path); }}>📄 ${key}</a>`
+                    : html`<span class="index-link index-dir">📁 ${key}</span>`
+                  }
+                  ${children.length > 0 && html`<div class="index-children">${renderTree(node[key], path)}</div>`}
+                </li>
+              `;
+            })}
+          </ul>
+        `;
+      }
+      return html`<div class="p-2">${renderTree(tree)}</div>`;
+    }
+
+    // ── Breadcrumb ────────────────────────────────────────────
+    function Breadcrumb({ page, onNavigate }) {
+      const parts = page === 'index' ? [] : page.split('/');
+      return html`
+        <div class="breadcrumb-wiki">
+          <a href="#" onClick=${(e) => { e.preventDefault(); onNavigate('index'); }}>
+            ${icoHome} <span class="ms-1">Home</span>
+          </a>
+          ${parts.map((p, i) => {
+            const path = parts.slice(0, i + 1).join('/');
+            return html`
+              <span key=${i}>
+                <span class="mx-1 text-muted">›</span>
+                <a href="#" onClick=${(e) => { e.preventDefault(); onNavigate(path); }}>${p}</a>
+              </span>
+            `;
+          })}
+        </div>
+      `;
+    }
+
+    // ── Rendered Content ──────────────────────────────────────
+    function RenderedContent({ htmlContent, page, pages, onNavigate }) {
+      const contentRef = useRef(null);
+
+      useEffect(() => {
+        if (!contentRef.current) return;
+
+        // Highlight code blocks
+        contentRef.current.querySelectorAll('pre code').forEach(block => {
+          hljs.highlightElement(block);
+        });
+
+        // Add heading IDs
+        const seen = {};
+        contentRef.current.querySelectorAll('h1, h2, h3').forEach(h => {
+          let slug = slugify(h.textContent);
+          if (seen[slug]) { seen[slug]++; slug += '-' + seen[slug]; }
+          else { seen[slug] = 1; }
+          h.id = slug;
+        });
+
+        // Rewrite internal links
+        contentRef.current.querySelectorAll('a[href]').forEach(a => {
+          const href = a.getAttribute('href');
+          if (href && !href.startsWith('http') && !href.startsWith('#') && !href.startsWith('mailto:')) {
+            const cleanHref = href.replace(/\.md$/, '');
+            const base = page.includes('/') ? page.slice(0, page.lastIndexOf('/') + 1) : '';
+            const target = resolvePath(base, cleanHref);
+            if (pages.has(target) || target === 'index') {
+              a.href = '#';
+              a.addEventListener('click', (e) => {
+                e.preventDefault();
+                onNavigate(target);
+              });
+            }
+          }
+        });
+      }, [htmlContent, page]);
+
+      return html`<div ref=${contentRef} class="wiki-content" dangerouslySetInnerHTML=${{ __html: htmlContent }} />`;
+    }
+
+    // ── Placeholder ───────────────────────────────────────────
+    function Placeholder({ onOpen }) {
+      return html`
+        <div class="placeholder-box">
+          <div class="display-1 mb-3">📚</div>
+          <h2 class="mb-3">Local Wiki</h2>
+          <p class="text-muted mb-4">
+            Select a folder on your computer containing <code>.md</code> files<br/>
+            to browse them as a wiki.
+          </p>
+          <button class="btn btn-success btn-lg btn-open-folder" onClick=${onOpen}>
+            ${icoFolder} <span class="ms-2">Open Folder</span>
+          </button>
+          <p class="small text-muted mt-3">
+            Requires a browser with File System Access API support<br/>
+            (Chrome, Edge, Opera)
+          </p>
+        </div>
+      `;
+    }
+
+    // ── Main App ──────────────────────────────────────────────
+    function App() {
+      const [dirHandle, setDirHandle] = useState(null);
+      const [files, setFiles] = useState({});
+      const [fileHandles, setFileHandles] = useState({});
+      const [pages, setPages] = useState(new Set());
+      const [tree, setTree] = useState({});
+      const [currentPage, setCurrentPage] = useState('index');
+      const [htmlContent, setHtmlContent] = useState('');
+      const [rawMd, setRawMd] = useState('');
+      const [headings, setHeadings] = useState([]);
+      const [activeTab, setActiveTab] = useState('toc');
+      const [toast, setToast] = useState(null);
+      const [wikiName, setWikiName] = useState('Local Wiki');
+      const [loading, setLoading] = useState(false);
+      const [editing, setEditing] = useState(false);
+
+      // ── Recursively read all .md files ──────────────────────
+      const readDirectory = useCallback(async (handle, basePath = '') => {
+        const result = {};
+        const handles = {};
+        const pageSet = new Set();
+        for await (const [name, entry] of handle.entries()) {
+          if (entry.kind === 'file' && name.endsWith('.md')) {
+            const path = basePath ? basePath + '/' + name.replace(/\.md$/, '') : name.replace(/\.md$/, '');
+            handles[path] = entry;
+            const file = await entry.getFile();
+            const content = await file.text();
+            result[path] = content;
+            pageSet.add(path);
+          } else if (entry.kind === 'directory') {
+            const sub = await readDirectory(entry, basePath ? basePath + '/' + name : name);
+            Object.assign(result, sub.files);
+            Object.assign(handles, sub.handles);
+            for (const p of sub.pages) pageSet.add(p);
+          }
+        }
+        return { files: result, handles, pages: pageSet };
+      }, []);
+
+      // ── Build tree from flat page list ──────────────────────
+      const buildTree = useCallback((pageSet) => {
+        const t = {};
+        for (const page of pageSet) {
+          const parts = page.split('/');
+          let node = t;
+          for (const p of parts) {
+            node[p] = node[p] || {};
+            node = node[p];
+          }
+        }
+        return t;
+      }, []);
+
+      // ── Extract headings from HTML ──────────────────────────
+      const extractHeadings = useCallback((htmlString) => {
+        const div = document.createElement('div');
+        div.innerHTML = htmlString;
+        const hs = [];
+        const seen = {};
+        div.querySelectorAll('h1, h2, h3').forEach(h => {
+          let slug = slugify(h.textContent);
+          if (seen[slug]) { seen[slug]++; slug += '-' + seen[slug]; }
+          else { seen[slug] = 1; }
+          hs.push({ level: parseInt(h.tagName[1]), text: h.textContent, id: slug });
+        });
+        return hs;
+      }, []);
+
+      // ── Open folder handler ─────────────────────────────────
+      const handleOpenFolder = useCallback(async () => {
+        try {
+          setLoading(true);
+          const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+          setDirHandle(handle);
+          setWikiName(handle.name);
+          const { files: f, handles: h, pages: p } = await readDirectory(handle);
+          setFiles(f);
+          setFileHandles(h);
+          setPages(p);
+          setTree(buildTree(p));
+          setEditing(false);
+
+          const initialPage = p.has('index') ? 'index' : [...p][0] || 'index';
+          setCurrentPage(initialPage);
+          const md = f[initialPage] || '*No content found.*';
+          setRawMd(md);
+          const rendered = marked.parse(md);
+          setHtmlContent(rendered);
+          setHeadings(extractHeadings(rendered));
+          setToast({ message: `Loaded ${p.size} page(s) from "${handle.name}"`, type: 'success' });
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            setToast({ message: 'Error: ' + err.message, type: 'error' });
+          }
+        } finally {
+          setLoading(false);
+        }
+      }, [readDirectory, buildTree, extractHeadings]);
+
+      // ── Navigate to page ────────────────────────────────────
+      const navigate = useCallback((page) => {
+        const md = files[page];
+        if (md !== undefined) {
+          setEditing(false);
+          setCurrentPage(page);
+          setRawMd(md);
+          const rendered = marked.parse(md);
+          setHtmlContent(rendered);
+          setHeadings(extractHeadings(rendered));
+          window.scrollTo(0, 0);
+          document.title = (rendered.match(/<h1[^>]*>([^<]+)<\/h1>/) || [, page])[1] + ' — Wiki';
+        }
+      }, [files, extractHeadings]);
+
+      // ── Toggle edit mode ───────────────────────────────────
+      const handleEdit = useCallback(() => {
+        setEditing(true);
+      }, []);
+
+      const handleCancel = useCallback(() => {
+        setEditing(false);
+      }, []);
+
+      // ── Save page back to disk ─────────────────────────────
+      const handleSave = useCallback(async () => {
+        try {
+          const fh = fileHandles[currentPage];
+          if (!fh) {
+            setToast({ message: 'Cannot save: no file handle found.', type: 'error' });
+            return;
+          }
+          const writable = await fh.createWritable();
+          await writable.write(rawMd);
+          await writable.close();
+
+          const newFiles = { ...files, [currentPage]: rawMd };
+          setFiles(newFiles);
+          setEditing(false);
+
+          const rendered = marked.parse(rawMd);
+          setHtmlContent(rendered);
+          setHeadings(extractHeadings(rendered));
+          setToast({ message: `Page "${currentPage}" saved to disk.`, type: 'success' });
+        } catch (err) {
+          setToast({ message: 'Save error: ' + err.message, type: 'error' });
+        }
+      }, [currentPage, rawMd, files, fileHandles, extractHeadings]);
+
+      // ── Ctrl+S to save ─────────────────────────────────────
+      useEffect(() => {
+        const handler = (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 's' && editing) {
+            e.preventDefault();
+            handleSave();
+          }
+          if (e.key === 'Escape' && editing) {
+            handleCancel();
+          }
+        };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+      }, [editing, handleSave, handleCancel]);
+
+      // ── Render (no folder selected) ─────────────────────────
+      if (!dirHandle) {
+        return html`
+          <div>
+            <nav class="app-header navbar navbar-dark">
+              <div class="container-fluid">
+                <span class="navbar-brand d-flex align-items-center">
+                  ${icoWikiLogo} Local Wiki
+                </span>
+                <span class="badge bg-light text-dark">Preact + HTM</span>
+              </div>
+            </nav>
+            <${Placeholder} onOpen=${handleOpenFolder} />
+            ${toast && html`<div class="toast-container"><${Toast} message=${toast.message} type=${toast.type} onClose=${() => setToast(null)} /></div>`}
+          </div>
+        `;
+      }
+
+      // ── Render (wiki loaded) ────────────────────────────────
+      return html`
+        <div>
+          <nav class="app-header navbar navbar-dark">
+            <div class="container-fluid">
+              <span class="navbar-brand d-flex align-items-center">
+                ${icoWikiLogo} ${wikiName}
+              </span>
+              <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-light" onClick=${() => navigate('index')} title="Home">
+                  ${icoHome}
+                </button>
+                ${!editing && html`
+                  <button class="btn btn-sm btn-outline-light" onClick=${handleEdit} title="Edit page">
+                    ${icoEdit}
+                  </button>
+                `}
+                ${editing && html`
+                  <button class="btn btn-sm btn-outline-success" onClick=${handleSave} title="Save (Ctrl+S)">
+                    ${icoSave}
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger" onClick=${handleCancel} title="Cancel (Esc)">
+                    ${icoCancel}
+                  </button>
+                `}
+                <button class="btn btn-sm btn-outline-light" onClick=${() => window.scrollTo({ top: 0, behavior: 'smooth' })} title="Go to top">
+                  ${icoTop}
+                </button>
+                <button class="btn btn-sm btn-outline-warning" onClick=${handleOpenFolder} title="Open another folder">
+                  ${icoFolder}
+                </button>
+                <span class="badge bg-light text-dark ms-2">Preact + HTM</span>
+              </div>
+            </div>
+          </nav>
+
+          <${Breadcrumb} page=${currentPage} onNavigate=${navigate} />
+
+          <div class="main-layout">
+            <aside class="sidebar">
+              ${activeTab === 'toc'
+                ? html`<${SidebarTOC} headings=${headings} activeTab=${activeTab} setActiveTab=${setActiveTab} />`
+                : html`
+                    <ul class="nav nav-tabs nav-fill">
+                      <li class="nav-item">
+                        <button class=${`nav-link ${activeTab === 'toc' ? 'active' : ''}`} onClick=${() => setActiveTab('toc')}>${icoToc} <span class="ms-1 d-none d-md-inline">TOC</span></button>
+                      </li>
+                      <li class="nav-item">
+                        <button class=${`nav-link ${activeTab === 'index' ? 'active' : ''}`} onClick=${() => setActiveTab('index')}>${icoIndex} <span class="ms-1 d-none d-md-inline">Index</span></button>
+                      </li>
+                    </ul>
+                    <div class="flex-grow-1 overflow-auto p-2">
+                      <${SidebarIndex} tree=${tree} pages=${pages} onNavigate=${navigate} />
+                    </div>
+                  `
+              }
+            </aside>
+
+            <main class="content-area">
+              ${loading
+                ? html`
+                    <div class="text-center py-5">
+                      <div class="spinner-border text-success" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                      </div>
+                      <p class="mt-2 text-muted">Reading files...</p>
+                    </div>
+                  `
+                : editing
+                  ? html`
+                      <div>
+                        <div class="editor-toolbar">
+                          <button class="btn btn-sm btn-success" onClick=${handleSave} title="Save (Ctrl+S)">
+                            ${icoSave} Save
+                          </button>
+                          <button class="btn btn-sm btn-outline-secondary" onClick=${handleCancel} title="Cancel (Esc)">
+                            ${icoCancel} Cancel
+                          </button>
+                          <span class="ms-auto text-muted small">Ctrl+S to save · Esc to cancel</span>
+                        </div>
+                        <textarea
+                          class="editor-textarea"
+                          value=${rawMd}
+                          onInput=${(e) => setRawMd(e.target.value)}
+                          spellcheck="false"
+                          autofocus=${true}
+                        />
+                      </div>
+                    `
+                  : html`<${RenderedContent} htmlContent=${htmlContent} page=${currentPage} pages=${pages} onNavigate=${navigate} />`
+              }
+            </main>
+          </div>
+
+          ${toast && html`<div class="toast-container"><${Toast} message=${toast.message} type=${toast.type} onClose=${() => setToast(null)} /></div>`}
+        </div>
+      `;
+    }
+
+    // ── Mount ─────────────────────────────────────────────────
+    render(html`<${App} />`, document.getElementById('root'));
+  </script>
+</body>
+</html>

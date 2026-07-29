@@ -480,6 +480,39 @@
             </li>
         </ul>
 
+        <div class="desc" style="margin-top:1rem;">
+            <p><strong>Wiki Local</strong> — wiki del lado del cliente que lee ficheros Markdown del disco:</p>
+            <p style="margin-top:0.5rem;">
+                usa la File System Access API para leer un directorio local con ficheros <code>.md</code>,
+                renderiza con <code>marked.js</code>, resalta código con <code>highlight.js</code>,
+                navegación con breadcrumbs, TOC generado a partir de encabezados e índice de páginas en árbol.
+            </p>
+        </div>
+        <ul class="list">
+            <li>
+                <a href="wiki/wiki01.html">
+                    <div class="title">wiki01.html — Wiki Local — Bootstrap + React + JSX</div>
+                    <div class="meta">
+                        <span class="badge badge-bs">Bootstrap</span>
+                        <span class="badge badge-babel">Babel</span>
+                        React 18 UMD + JSX con Babel standalone, Bootstrap 5, marked.js, highlight.js
+                        <br/><code>useState</code> <code>useEffect</code> <code>useCallback</code> <code>useRef</code>
+                    </div>
+                </a>
+            </li>
+            <li>
+                <a href="wiki/wiki02.html">
+                    <div class="title">wiki02.html — Wiki Local — Bootstrap + Preact + HTM</div>
+                    <div class="meta">
+                        <span class="badge badge-bs">Bootstrap</span>
+                        <span class="badge badge-htm">HTM</span>
+                        Preact con <code>htm</code> (tagged templates), sin Babel ni JSX, Bootstrap 5, marked.js, highlight.js
+                        <br/><code>useState</code> <code>useEffect</code> <code>useCallback</code> <code>useRef</code> (Preact)
+                    </div>
+                </a>
+            </li>
+        </ul>
+
         <p class="footer">React 18 &middot; vanilla JS &middot; TypeScript &middot; Bootstrap &middot; CDN &middot; sin empaquetadores</p>
     </main>
 </body>
